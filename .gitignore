@@ -1,0 +1,17 @@
+node_modules
+.pnpm-store
+
+.next
+dist
+out
+.turbo
+.vercel
+coverage
+
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+Thumbs.db
