@@ -9,7 +9,11 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:up": "docker compose up -d db",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:generate": "pnpm --filter @nexo/db db:generate",
+    "db:migrate": "pnpm --filter @nexo/db db:migrate",
+    "db:seed": "pnpm --filter @nexo/db db:seed",
+    "db:studio": "pnpm --filter @nexo/db db:studio"
   },
   "engines": {
     "node": ">=22"
