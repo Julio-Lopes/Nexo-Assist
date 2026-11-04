@@ -114,6 +114,8 @@ export const tickets = pgTable(
     /** Última atividade: base do cálculo de prazo (Anexo A). */
     updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at", tz),
+    /** Rascunho que originou o chamado; garante criação idempotente em retries. */
+    sourceDraftId: text("source_draft_id").unique(),
   },
   (t) => [
     index("tickets_requester_idx").on(t.requesterId),
