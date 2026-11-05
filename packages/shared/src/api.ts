@@ -1,5 +1,6 @@
 import type { Conversation, Message } from "./domain/conversation";
 import type { AgentStep } from "./domain/decision";
+import type { Ticket } from "./domain/ticket";
 
 export interface MessageUsage {
   used: number;
@@ -27,3 +28,19 @@ export const SYSTEM_OPTION_IDS = {
   retry: "action:retry",
   handoff: "action:handoff",
 } as const;
+
+/** Chamado com os campos calculados (prazo, vencimento, reabertura). */
+export interface TicketView extends Ticket {
+  dueAt: string | null;
+  overdue: boolean;
+  slaLabel: string;
+  reopenable: boolean;
+}
+
+export interface TicketEventView {
+  id: string;
+  kind: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}

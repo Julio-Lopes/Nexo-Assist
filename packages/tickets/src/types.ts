@@ -1,21 +1,6 @@
-import type { Category, SupportLevel, Ticket, TicketDraft } from "@nexo/shared";
+import type { Category, SupportLevel, TicketDraft, TicketEventView, TicketView } from "@nexo/shared";
 
-/** Chamado com os campos calculados que o agent e a interface precisam. */
-export interface TicketView extends Ticket {
-  /** Prazo da próxima resposta; null quando o chamado está fechado. */
-  dueAt: string | null;
-  overdue: boolean;
-  slaLabel: string;
-  reopenable: boolean;
-}
-
-export interface TicketEventView {
-  id: string;
-  kind: string;
-  authorName: string;
-  body: string;
-  createdAt: string;
-}
+export type { TicketEventView, TicketView };
 
 export interface Actor {
   id: string | null;
