@@ -47,6 +47,9 @@ export const quickOptionSchema = z.object({
 export type QuickOption = z.infer<typeof quickOptionSchema>;
 
 export const DRAFT_STATES = ["pending", "confirmed", "cancelled"] as const;
+export const DRAFT_MODES = ["create", "update", "reopen"] as const;
+export const draftModeSchema = z.enum(DRAFT_MODES);
+export type DraftMode = z.infer<typeof draftModeSchema>;
 
 /** Cards que aparecem dentro das mensagens do agent (Telas 2 e 3). */
 export const messageAttachmentSchema = z.discriminatedUnion("kind", [
@@ -55,10 +58,13 @@ export const messageAttachmentSchema = z.discriminatedUnion("kind", [
     kind: z.literal("ticket_selector"),
     ticketIds: z.array(ticketNumberSchema).min(1),
   }),
-  z.object({
+    z.object({
     kind: z.literal("draft"),
     draftId: z.string().min(1),
+    mode: draftModeSchema,
+    targetTicketId: ticketNumberSchema.nullable(),
     draft: ticketDraftSchema,
+    note: z.string().nullable(),
     dueAt: z.iso.datetime(),
     state: z.enum(DRAFT_STATES),
   }),
