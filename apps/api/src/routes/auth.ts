@@ -1,0 +1,50 @@
+import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
+import { z } from "zod";
+import { eq, users } from "@nexo/db";
+import { requireAuth } from "../auth/middleware";
+import {
+  SESSION_COOKIE,
+  clearSessionCookie,
+  createSession,
+  revokeSession,
+  setSessionCookie,
+} from "../auth/session";
+import type { Container } from "../context";
+import { ApiError } from "../http/errors";
+import { toUser } from "../http/mappers";
+import type { AppEnv } from "../http/types";
+import { parseJson } from "../http/validation";
+
+const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email("E-mail inválido.")),
+  password: z.string().min(1, "Informe a senha."),
+});
+
+export function authRoutes(container: Container) {
+  const app = new Hono<AppEnv>();
+
+  app.post("/login", async (c) => {
+    const { email } = await parseJson(c, loginSchema);
+
+    // Protótipo (PRD, Tela 1): qualquer senha vale para usuários cadastrados.
+    const [user] = await container.db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (!user) throw new ApiError(401, "invalid_credentials", "E-mail ou senha inválidos.");
+
+    const session = await createSession(container.db, user.id, container.env.SESSION_TTL_HOURS);
+    setSessionCookie(c, session.token, session.expiresAt, container.env);
+
+    return c.json({ user: toUser(user) });
+  });
+
+  app.post("/logout", async (c) => {
+    const token = getCookie(c, SESSION_COOKIE);
+    if (token) await revokeSession(container.db, token);
+    clearSessionCookie(c);
+    return c.json({ ok: true });
+  });
+
+  app.get("/me", requireAuth(container), (c) => c.json({ user: c.get("user") }));
+
+  return app;
+}
