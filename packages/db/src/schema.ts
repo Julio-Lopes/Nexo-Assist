@@ -13,6 +13,7 @@ import {
   AFFECTED,
   CATEGORIES,
   CONVERSATION_STATUSES,
+  DRAFT_MODES,
   DRAFT_STATES,
   HANDOFF_REASONS,
   MESSAGE_AUTHORS,
@@ -41,6 +42,7 @@ export const conversationStatusEnum = pgEnum("conversation_status", CONVERSATION
 export const handoffReasonEnum = pgEnum("handoff_reason", HANDOFF_REASONS);
 export const messageAuthorEnum = pgEnum("message_author", MESSAGE_AUTHORS);
 export const draftStateEnum = pgEnum("draft_state", DRAFT_STATES);
+export const draftModeEnum = pgEnum("draft_mode", DRAFT_MODES);
 
 export const TICKET_EVENT_KINDS = [
   "created",
@@ -198,6 +200,9 @@ export const ticketDrafts = pgTable(
       .references(() => users.id),
     /** Preenchido quando o rascunho atualiza um chamado existente em vez de criar. */
     targetTicketId: text("target_ticket_id").references(() => tickets.id),
+    mode: draftModeEnum("mode").notNull().default("create"),
+    /** Texto do complemento ou motivo da reabertura. */
+    note: text("note"),
     payload: jsonb("payload").$type<TicketDraft>().notNull(),
     state: draftStateEnum("state").notNull().default("pending"),
     createdAt: timestamp("created_at", tz).notNull().defaultNow(),
