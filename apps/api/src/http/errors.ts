@@ -23,16 +23,25 @@ const TICKET_STATUS: Record<TicketErrorCode, ContentfulStatusCode> = {
   unavailable: 503,
 };
 
-const body = (code: string, message: string) => ({ error: { code, message } });
+export interface ErrorDescription {
+  status: ContentfulStatusCode;
+  code: string;
+  message: string;
+}
+
+export function describeError(err: unknown): ErrorDescription {
+  if (err instanceof ApiError) return { status: err.status, code: err.code, message: err.message };
+  if (err instanceof TicketError) return { status: TICKET_STATUS[err.code], code: err.code, message: err.message };
+  if (err instanceof ConversationError) {
+    return { status: err.code === "not_found" ? 404 : 409, code: err.code, message: err.message };
+  }
+  return { status: 500, code: "internal", message: "Erro inesperado. Tente novamente." };
+}
 
 export const handleError: ErrorHandler<AppEnv> = (err, c) => {
-  if (err instanceof ApiError) return c.json(body(err.code, err.message), err.status);
-  if (err instanceof TicketError) return c.json(body(err.code, err.message), TICKET_STATUS[err.code]);
-  if (err instanceof ConversationError) {
-    return c.json(body(err.code, err.message), err.code === "not_found" ? 404 : 409);
-  }
   if (err instanceof HTTPException) return err.getResponse();
 
-  console.error("[api] erro não tratado", err);
-  return c.json(body("internal", "Erro inesperado. Tente novamente."), 500);
+  const { status, code, message } = describeError(err);
+  if (status === 500) console.error("[api] erro não tratado", err);
+  return c.json({ error: { code, message } }, status);
 };

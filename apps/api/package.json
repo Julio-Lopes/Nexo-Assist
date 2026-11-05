@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
+    "@nexo/agent": "workspace:*",
     "@nexo/db": "workspace:*",
     "@nexo/shared": "workspace:*",
     "@nexo/tickets": "workspace:*",

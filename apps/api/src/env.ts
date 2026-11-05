@@ -7,6 +7,9 @@ const envSchema = z.object({
   /** Origens permitidas (CORS e CSRF), separadas por vírgula. */
   WEB_URL: z.string().min(1).default("http://localhost:3000"),
   SESSION_TTL_HOURS: z.coerce.number().positive().default(12),
+  LLM_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  /** Lida diretamente pelo Mastra; validada aqui só para avisar quando falta. */
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
   /** Definida automaticamente pela Vercel. */
   VERCEL: z.string().optional(),
 });
