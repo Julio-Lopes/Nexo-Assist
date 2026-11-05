@@ -70,6 +70,19 @@ export const messageAttachmentSchema = z.discriminatedUnion("kind", [
 ]);
 export type MessageAttachment = z.infer<typeof messageAttachmentSchema>;
 
+export const messageSchema = z.object({
+  id: z.string().min(1),
+  conversationId: z.string().min(1),
+  author: messageAuthorSchema,
+  authorName: z.string().nullable(),
+  content: z.string(),
+  attachments: z.array(messageAttachmentSchema),
+  /** Preenchido só nas mensagens do agent. */
+  decision: agentDecisionSchema.nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type Message = z.infer<typeof messageSchema>;
+
 export const conversationSchema = z.object({
   id: z.string().min(1),
   employeeId: z.string().min(1),
