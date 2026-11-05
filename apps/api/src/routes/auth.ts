@@ -16,22 +16,26 @@ import { toUser } from "../http/mappers";
 import type { AppEnv } from "../http/types";
 import { parseJson } from "../http/validation";
 
+const REMEMBER_TTL_HOURS = 24 * 7;
+
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email("E-mail inválido.")),
   password: z.string().min(1, "Informe a senha."),
+  remember: z.boolean().default(false),
 });
 
 export function authRoutes(container: Container) {
   const app = new Hono<AppEnv>();
 
   app.post("/login", async (c) => {
-    const { email } = await parseJson(c, loginSchema);
+    const { email, remember } = await parseJson(c, loginSchema);
 
     // Protótipo (PRD, Tela 1): qualquer senha vale para usuários cadastrados.
     const [user] = await container.db.select().from(users).where(eq(users.email, email)).limit(1);
     if (!user) throw new ApiError(401, "invalid_credentials", "E-mail ou senha inválidos.");
 
-    const session = await createSession(container.db, user.id, container.env.SESSION_TTL_HOURS);
+    const ttl = remember ? REMEMBER_TTL_HOURS : container.env.SESSION_TTL_HOURS;
+    const session = await createSession(container.db, user.id, ttl);
     setSessionCookie(c, session.token, session.expiresAt, container.env);
 
     return c.json({ user: toUser(user) });
