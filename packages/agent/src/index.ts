@@ -7,3 +7,4 @@ export { buildModelMessages, type ModelMessage } from "./history";
 export { resolveModel } from "./agent";
 export { runAgentTurn, AgentUnavailableError, type RunTurnOptions, type TurnResult } from "./run-turn";
 export { PostgresDraftStore } from "./adapters/postgres-draft-store";
+export { handoffToAnalyst } from "./handlers";
