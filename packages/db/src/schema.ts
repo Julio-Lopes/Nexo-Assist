@@ -160,6 +160,8 @@ export const conversations = pgTable(
     createdAt: timestamp("created_at", tz).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", tz).notNull().defaultNow(),
     closedAt: timestamp("closed_at", tz),
+    /** Trava do turno do agent: evita dois turnos simultâneos na mesma conversa. */
+    agentLockedUntil: timestamp("agent_locked_until", tz),
   },
   (t) => [
     index("conversations_employee_idx").on(t.employeeId),

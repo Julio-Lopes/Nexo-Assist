@@ -1,0 +1,1 @@
+ALTER TABLE "conversations" ADD COLUMN "agent_locked_until" timestamp with time zone;
