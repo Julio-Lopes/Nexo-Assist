@@ -8,8 +8,12 @@ import {
   gt,
   gte,
   inArray,
+  isNull,
+  lte,
   messages,
   ne,
+  or,
+  sql,
   users,
   type ConversationRow,
   type Database,
@@ -256,6 +260,45 @@ export class ConversationService {
       mine: mine?.value ?? 0,
       all: get("waiting_human") + get("with_agent") + get("with_human"),
     };
+  }
+
+  /** Trava atômica: só um turno do agent por conversa, inclusive entre instâncias serverless. */
+  async tryLockAgent(conversationId: string, ttlMs: number): Promise<boolean> {
+    const now = new Date();
+    const rows = await this.db
+      .update(conversations)
+      .set({ agentLockedUntil: new Date(now.getTime() + ttlMs) })
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          or(isNull(conversations.agentLockedUntil), lte(conversations.agentLockedUntil, now)),
+        ),
+      )
+      .returning({ id: conversations.id });
+    return rows.length > 0;
+  }
+
+  async unlockAgent(conversationId: string): Promise<void> {
+    await this.db
+      .update(conversations)
+      .set({ agentLockedUntil: null })
+      .where(eq(conversations.id, conversationId));
+  }
+
+  /** Atualiza o estado do card de rascunho nas mensagens que o exibem. */
+  async syncDraftState(draftId: string, state: "confirmed" | "cancelled"): Promise<void> {
+    const probe = JSON.stringify([{ kind: "draft", draftId }]);
+    const rows = await this.db
+      .select()
+      .from(messages)
+      .where(sql`${messages.attachments} @> ${probe}::jsonb`);
+
+    for (const row of rows) {
+      const attachments: MessageAttachment[] = row.attachments.map((a) =>
+        a.kind === "draft" && a.draftId === draftId ? { ...a, state } : a,
+      );
+      await this.db.update(messages).set({ attachments }).where(eq(messages.id, row.id));
+    }
   }
 
   /** Lock de linha: dois analistas assumindo ao mesmo tempo não passam juntos. */
