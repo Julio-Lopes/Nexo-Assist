@@ -4,3 +4,4 @@ export * from "./domain/decision";
 export * from "./domain/conversation";
 export * from "./domain/priority";
 export * from "./domain/sla";
+export * from "./api";
