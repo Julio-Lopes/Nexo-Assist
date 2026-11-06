@@ -7,7 +7,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "typecheck": "pnpm --filter @nexo/shared build && tsc --noEmit"
+    "typecheck": "pnpm --filter @nexo/shared build && tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@nexo/shared": "workspace:*",
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.32",
     "tailwindcss": "^4.3.4",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
   }
 }
