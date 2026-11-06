@@ -13,7 +13,8 @@
     "db:generate": "pnpm --filter @nexo/db db:generate",
     "db:migrate": "pnpm --filter @nexo/db db:migrate",
     "db:seed": "pnpm --filter @nexo/db db:seed",
-    "db:studio": "pnpm --filter @nexo/db db:studio"
+    "db:studio": "pnpm --filter @nexo/db db:studio",
+    "eval": "pnpm --filter @nexo/agent eval"
   },
   "engines": {
     "node": ">=22"
