@@ -30,3 +30,19 @@ export function timeAgo(iso: string, now: number = Date.now()): string {
   const days = Math.round(hours / 24);
   return days === 1 ? "há 1 dia" : `há ${days} dias`;
 }
+
+/** "Hoje", "Ontem" ou "16 out" */
+export function formatRelativeDay(iso: string, now: Date = new Date()): string {
+  const day = formatDayMonth(iso);
+  if (day === formatDayMonth(now.toISOString())) return "Hoje";
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (day === formatDayMonth(yesterday.toISOString())) return "Ontem";
+  return day;
+}
+
+/** Horário se for hoje; "ontem" ou a data nos outros casos. */
+export function formatListTime(iso: string, now: Date = new Date()): string {
+  const day = formatRelativeDay(iso, now);
+  if (day === "Hoje") return formatTime(iso);
+  return day === "Ontem" ? "ontem" : day;
+}
