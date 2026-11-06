@@ -14,6 +14,8 @@ export function createDb(url: string, options: CreateDbOptions = {}) {
     connect_timeout: 10,
     // compatível com pgbouncer em modo transaction, caso seja usado na frente do Postgres
     prepare: false,
+    // Avisos como "schema já existe" nas migrations não são erros.
+    onnotice: () => {},
   });
 
   const db = drizzle(client, { schema });
