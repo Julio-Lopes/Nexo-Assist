@@ -2,7 +2,7 @@ const STOPWORDS = new Set([
   "a", "o", "as", "os", "e", "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas",
   "um", "uma", "para", "pra", "por", "com", "sem", "que", "nao", "meu", "minha", "meus",
   "minhas", "muito", "mais", "apos", "esta", "estou", "ao", "aos", "cada", "desde", "ja",
-  "ainda", "tem", "ter", "consigo", "preciso", "quando", "como",
+  "ainda", "tem", "ter", "consigo", "preciso", "quando", "como", "continua",
 ]);
 
 export function normalize(text: string): string {
@@ -16,10 +16,18 @@ export function tokenize(text: string): string[] {
     .filter((t) => t.length > 0 && !STOPWORDS.has(t) && (t.length >= 3 || /^\d+$/.test(t)));
 }
 
-/** Coeficiente de Dice entre os tokens dos dois textos (0 a 1). */
+/**
+ * Radical simples de 4 letras: "lentidão" e "lento" viram "lent", "conexão" e "conecta" viram "cone".
+ * Pode aproximar palavras diferentes, mas o agent sempre confirma com o funcionário antes de tratar como duplicado.
+ */
+export function stem(token: string): string {
+  return /^\d+$/.test(token) ? token : token.slice(0, 4);
+}
+
+/** Coeficiente de Dice entre os radicais dos dois textos (0 a 1). */
 export function similarity(a: string, b: string): number {
-  const left = new Set(tokenize(a));
-  const right = new Set(tokenize(b));
+  const left = new Set(tokenize(a).map(stem));
+  const right = new Set(tokenize(b).map(stem));
   if (left.size === 0 || right.size === 0) return 0;
 
   let shared = 0;

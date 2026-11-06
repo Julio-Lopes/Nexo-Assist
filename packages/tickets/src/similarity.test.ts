@@ -29,4 +29,9 @@ describe("similarity", () => {
   it("retorna 0 quando um dos textos não tem termos relevantes", () => {
     expect(similarity("não está", "Senha do SAP bloqueada")).toBe(0);
   });
+
+  it("aproxima variações da mesma palavra", () => {
+    expect(similarity("Lentidão no notebook após atualização", "Notebook lento após atualização do Windows"))
+      .toBeGreaterThanOrEqual(SIMILARITY_LIKELY_DUPLICATE);
+  });
 });
