@@ -15,6 +15,7 @@ FROM base AS builder
 COPY --from=pruner /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
+COPY --from=pruner /app/tsconfig.base.json ./tsconfig.base.json
 RUN pnpm turbo run build --filter=@nexo/api...
 
 FROM base AS runner

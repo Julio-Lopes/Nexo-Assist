@@ -18,5 +18,42 @@ services:
       timeout: 3s
       retries: 10
 
+  # Aplicação completa: docker compose --profile app up --build
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: nexo-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://nexo:nexo@db:5432/nexo
+      WEB_URL: http://localhost:3000
+      COOKIE_SECURE: "false"
+      SEED_IF_EMPTY: "true"
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    container_name: nexo-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
 volumes:
   nexo-db-data:
