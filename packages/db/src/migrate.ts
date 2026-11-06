@@ -1,13 +1,13 @@
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb } from "./client";
 import { loadLocalEnv, requireDatabaseUrl } from "./env";
+import { runMigrations } from "./migrations";
 
 loadLocalEnv();
 
 async function main(): Promise<void> {
   const { db, close } = createDb(requireDatabaseUrl(), { max: 1 });
   try {
-    await migrate(db, { migrationsFolder: "./migrations" });
+    await runMigrations(db);
     console.log("Migrations aplicadas.");
   } finally {
     await close();

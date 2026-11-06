@@ -1,16 +1,6 @@
 import { createDb } from "../client";
 import { isLocalDatabase, loadLocalEnv, requireDatabaseUrl } from "../env";
-import {
-  conversations,
-  kbArticles,
-  messages,
-  sessions,
-  ticketDrafts,
-  ticketEvents,
-  tickets,
-  users,
-} from "../schema";
-import { buildSeed } from "./data";
+import { seedDatabase } from "./seed";
 
 loadLocalEnv();
 
@@ -23,29 +13,9 @@ async function main(): Promise<void> {
   }
 
   const { db, close } = createDb(url, { max: 1 });
-  const seed = buildSeed(new Date());
-
   try {
-    await db.transaction(async (tx) => {
-      // ordem inversa das dependências
-      await tx.delete(messages);
-      await tx.delete(ticketDrafts);
-      await tx.delete(conversations);
-      await tx.delete(ticketEvents);
-      await tx.delete(tickets);
-      await tx.delete(sessions);
-      await tx.delete(kbArticles);
-      await tx.delete(users);
-
-      await tx.insert(users).values(seed.users);
-      await tx.insert(kbArticles).values(seed.articles);
-      await tx.insert(tickets).values(seed.tickets);
-      await tx.insert(ticketEvents).values(seed.events);
-    });
-
-    console.log(
-      `Seed concluído: ${seed.users.length} usuários, ${seed.articles.length} artigos, ${seed.tickets.length} chamados.`,
-    );
+    const result = await seedDatabase(db);
+    console.log(`Seed concluído: ${result.users} usuários, ${result.articles} artigos, ${result.tickets} chamados.`);
   } finally {
     await close();
   }

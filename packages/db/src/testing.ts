@@ -1,12 +1,8 @@
-import { fileURLToPath } from "node:url";
 import { sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb, type Database } from "./client";
+import { runMigrations } from "./migrations";
 import { kbArticles, ticketEvents, tickets, users } from "./schema";
 import { buildSeed } from "./seed/data";
-
-// Resolve tanto de src/ (tsx) quanto de dist/ (build): ambos ficam ao lado de migrations/.
-const MIGRATIONS = fileURLToPath(new URL("../migrations", import.meta.url));
 
 export function testDatabaseUrl(name: string): string {
   const base = process.env.TEST_DATABASE_BASE_URL ?? "postgres://nexo:nexo@localhost:5432";
@@ -24,7 +20,7 @@ export interface TestDatabase {
 export async function setupTestDatabase(name: string): Promise<TestDatabase> {
   const url = testDatabaseUrl(name);
   const { db, close } = createDb(url, { max: 3 });
-  await migrate(db, { migrationsFolder: MIGRATIONS });
+  await runMigrations(db);
 
   const reset = async (now: Date = new Date()) => {
     await db.execute(
