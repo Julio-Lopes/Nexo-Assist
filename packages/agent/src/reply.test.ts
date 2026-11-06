@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { ReplyStream, cleanReply, extractLeakedDecision } from "./reply";
+import { ReplyStream, cleanReply, extractLeakedDecision, splitJsonBlocks } from "./reply";
 
-const leaked = '{"intent":"knowledge_question","understanding":"Perguntou o horário.","action":"answer_from_kb","confidence":1,"reason":"Artigo encontrado.","rulesApplied":[]}';
+const leaked =
+  '{"intent":"knowledge_question","understanding":"Perguntou o horário.","action":"answer_from_kb","confidence":1,"reason":"Artigo encontrado.","rulesApplied":[]}';
+
+describe("splitJsonBlocks", () => {
+  it("remove JSON que não é decisão, inclusive malformado", () => {
+    const raw =
+      'O prazo passou. { "ticket": { "id": "INC-20311", "overdue": true } } { "question": "Como deseja prosseguir?", "options": }';
+    expect(splitJsonBlocks(raw).text).toBe("O prazo passou.");
+  });
+
+  it("remove JSON que ficou sem fechar", () => {
+    expect(splitJsonBlocks('Confira abaixo. {"options": ["Sim", "Não"').text).toBe("Confira abaixo.");
+  });
+
+  it("respeita chaves dentro de strings", () => {
+    const { text, blocks } = splitJsonBlocks('Ok. {"texto": "use {nome}"} fim.');
+    expect(text).toBe("Ok. fim.");
+    expect(blocks).toHaveLength(1);
+  });
+
+  it("não mexe em chaves que não são JSON", () => {
+    const text = "Use o formato {nome}.{sobrenome}@nexo.com.br.";
+    expect(splitJsonBlocks(text).text).toBe(text);
+  });
+});
 
 describe("extractLeakedDecision", () => {
   it("separa a decisão escrita no fim do texto", () => {
@@ -15,31 +39,26 @@ describe("extractLeakedDecision", () => {
     expect(result.text).toBe("Pronto.");
     expect(result.decision).not.toBeNull();
   });
-
-  it("não mexe em chaves que não são uma decisão", () => {
-    const text = "Use o formato {nome}.{sobrenome}@nexo.com.br.";
-    expect(extractLeakedDecision(text)).toEqual({ text, decision: null });
-  });
 });
 
 describe("ReplyStream", () => {
-  it("segura o texto a partir de uma chave", () => {
+  it("nunca mostra o JSON retido", () => {
     const shown: string[] = [];
     const stream = new ReplyStream((d) => shown.push(d));
 
-    stream.push("Atendemos das 8h às 18h. ");
-    stream.push('{"intent":');
-    stream.push('"greeting"}');
+    stream.push("O prazo passou. ");
+    stream.push('{"ticket": {"id": "INC-20311"}}');
+    stream.push(" Como prefere seguir?");
+    stream.finish(extractLeakedDecision(stream.raw).text);
 
-    expect(shown.join("")).toBe("Atendemos das 8h às 18h. ");
-    expect(stream.raw).toContain('"greeting"');
+    expect(shown.join("")).toBe("O prazo passou. Como prefere seguir?");
   });
 
-  it("libera o trecho retido quando pedido", () => {
+  it("libera chaves comuns no fim", () => {
     const shown: string[] = [];
     const stream = new ReplyStream((d) => shown.push(d));
     stream.push("Formato {nome}.");
-    stream.flushHeld();
+    stream.finish(extractLeakedDecision(stream.raw).text);
     expect(shown.join("")).toBe("Formato {nome}.");
   });
 });

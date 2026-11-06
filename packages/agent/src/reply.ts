@@ -11,35 +11,83 @@ const leakedDecisionSchema = z.object({
   rulesApplied: z.array(z.string()).default([]),
 });
 
-/**
- * Modelos leves às vezes escrevem a decisão como JSON no texto em vez de chamar a ferramenta.
- * Separa esse bloco do texto e o devolve como decisão.
- */
-export function extractLeakedDecision(raw: string): { text: string; decision: DeclaredDecision | null } {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end <= start) return { text: raw, decision: null };
+/** Parece JSON: tem uma chave entre aspas seguida de dois-pontos. "{nome}" não conta. */
+const looksLikeJson = (block: string) => /"\s*:/.test(block);
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.slice(start, end + 1));
-  } catch {
-    return { text: raw, decision: null };
+/**
+ * Separa do texto os blocos com cara de JSON, inclusive malformados ou sem fechar.
+ * Respeita chaves dentro de strings para achar o fim certo de cada bloco.
+ */
+export function splitJsonBlocks(raw: string): { text: string; blocks: string[] } {
+  let text = "";
+  const blocks: string[] = [];
+  let i = 0;
+
+  while (i < raw.length) {
+    if (raw[i] !== "{") {
+      text += raw[i];
+      i++;
+      continue;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = raw.length - 1;
+
+    for (let j = i; j < raw.length; j++) {
+      const ch = raw[j];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') inString = true;
+      else if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) {
+        end = j;
+        break;
+      }
+    }
+
+    const block = raw.slice(i, end + 1);
+    if (looksLikeJson(block)) {
+      blocks.push(block);
+      i = end + 1;
+    } else {
+      text += raw[i];
+      i++;
+    }
   }
 
-  const result = leakedDecisionSchema.safeParse(parsed);
-  if (!result.success) return { text: raw, decision: null };
-
-  const before = raw.slice(0, start).replace(/```(?:json)?\s*$/i, "");
-  const after = raw.slice(end + 1).replace(/^\s*```/, "");
-
-  return {
-    text: `${before} ${after}`.trim(),
-    decision: { ...result.data, confidence: Math.min(1, Math.max(0, result.data.confidence)) },
-  };
+  return { text: text.replace(/```(?:json)?/gi, "").replace(/\s{2,}/g, " ").trim(), blocks };
 }
 
-/** Remove frases repetidas, "OK" solto e comentários de bastidor sobre os cards. */
+/**
+ * Modelos leves às vezes escrevem no texto o que deveria ser chamada de ferramenta.
+ * Todo JSON sai da resposta; se algum bloco for a decisão do turno, ele é devolvido.
+ */
+export function extractLeakedDecision(raw: string): { text: string; decision: DeclaredDecision | null } {
+  const { text, blocks } = splitJsonBlocks(raw);
+
+  for (const block of blocks) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(block);
+    } catch {
+      continue;
+    }
+    const result = leakedDecisionSchema.safeParse(parsed);
+    if (result.success) {
+      return { text, decision: { ...result.data, confidence: Math.min(1, Math.max(0, result.data.confidence)) } };
+    }
+  }
+
+  return { text, decision: null };
+}
+
+/** Remove frases repetidas, "OK" solto, colchetes e comentários de bastidor sobre os cards. */
 export function cleanReply(text: string): string {
   const withoutAsides = text
     .replace(/\s*\[[^\]]*\]/g, "")
@@ -60,8 +108,8 @@ export function cleanReply(text: string): string {
 }
 
 /**
- * Repassa o texto em streaming, mas segura tudo a partir de "{" ou "`":
- * se for um JSON de decisão vazado, ele nunca chega à tela.
+ * Repassa o texto em streaming, mas segura tudo a partir de "{" ou "`".
+ * No fim, só libera o que sobrou depois de remover os blocos JSON.
  */
 export class ReplyStream {
   private emitted = "";
@@ -85,11 +133,14 @@ export class ReplyStream {
     this.held = delta.slice(index);
   }
 
-  /** Libera o trecho retido quando ele não era uma decisão vazada. */
-  flushHeld(): void {
-    const held = this.held;
+  /** Emite a parte final já limpa, quando ela continua o que foi mostrado. */
+  finish(finalText: string): void {
     this.held = "";
-    this.emit(held);
+    const shown = this.emitted.trimEnd();
+    if (finalText.startsWith(shown)) {
+      const remainder = finalText.slice(shown.length);
+      this.emit(this.emitted.length > shown.length ? remainder.trimStart() : remainder);
+    }
   }
 
   get raw(): string {

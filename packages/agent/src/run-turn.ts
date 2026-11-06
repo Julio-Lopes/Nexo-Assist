@@ -84,15 +84,12 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<TurnResult>
     throw new AgentUnavailableError(error);
   }
 
-  // Decisão vazada no texto: sai da resposta e vira a decisão do turno, marcada como recuperada.
+  // JSON no texto nunca chega ao funcionário; se for a decisão do turno, é recuperada e marcada.
   const leaked = extractLeakedDecision(reply.raw);
-  if (leaked.decision) {
-    if (!recorder.declared) {
-      recorder.declared = { ...leaked.decision, rulesApplied: [...leaked.decision.rulesApplied, RECOVERED_RULE] };
-    }
-  } else {
-    reply.flushHeld();
+  if (leaked.decision && !recorder.declared) {
+    recorder.declared = { ...leaked.decision, rulesApplied: [...leaked.decision.rulesApplied, RECOVERED_RULE] };
   }
+  reply.finish(leaked.text);
 
   let text = cleanReply(leaked.text);
 
