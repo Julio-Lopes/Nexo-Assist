@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import type { User } from "@nexo/shared";
 import { ApiRequestError, api } from "./api-client";
 
@@ -48,14 +47,8 @@ export function useLogin() {
 }
 
 export function useLogout() {
-  const queryClient = useQueryClient();
-  const router = useRouter();
   return useMutation({
     mutationFn: () => api<{ ok: true }>("/auth/logout", { method: "POST" }),
-    onSettled: () => {
-      queryClient.clear();
-      queryClient.setQueryData(sessionKey, null);
-      router.replace("/login");
-    },
+    onSettled: () => window.location.replace("/login"),
   });
 }
