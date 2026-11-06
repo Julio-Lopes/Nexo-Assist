@@ -9,12 +9,20 @@ import { authRoutes } from "./routes/auth";
 import { consoleRoutes } from "./routes/console";
 import { employeeRoutes } from "./routes/employee";
 import { healthRoutes } from "./routes/health";
+import { bodyLimit } from "hono/body-limit";
 
 export function createApp(container: Container) {
   const app = new Hono<AppEnv>();
   const { origins } = container.env;
 
   app.use("*", logger());
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: 32 * 1024,
+      onError: (c) => c.json({ error: { code: "payload_too_large", message: "Requisição muito grande." } }, 413),
+    }),
+  );
   app.use(
     "*",
     cors({

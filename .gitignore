@@ -1,18 +1,26 @@
 node_modules
+**/node_modules
 .pnpm-store
 
 .next
+**/.next
 dist
+**/dist
 out
 .turbo
+**/.turbo
+.tsupgrader
+**/.tsupgrader
 .vercel
 coverage
 
+.git
 .env
 .env.*
 !.env.example
 
 *.log
+**/*.log
 *.tsbuildinfo
 .DS_Store
 Thumbs.db

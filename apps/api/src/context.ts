@@ -11,6 +11,7 @@ import { ChatService } from "./chat/chat-service";
 import { SyncedDraftStore } from "./chat/synced-draft-store";
 import { ConversationService } from "./conversations/conversation-service";
 import { loadEnv, type Env } from "./env";
+import { SlidingWindowLimiter } from "./http/rate-limit";
 
 export interface Container {
   env: Env;
@@ -55,7 +56,11 @@ export function buildContainer(env: Env, overrides: ContainerOverrides = {}): Co
     ...services,
     conversations,
     drafts,
-    chat: new ChatService(conversations, agentServices, env.LLM_MODEL),
+    chat: new ChatService(conversations, agentServices, env.LLM_MODEL, {
+      perMinute: new SlidingWindowLimiter(env.RATE_LIMIT_TURNS_PER_MINUTE, 60_000),
+      perUserPerDay: env.RATE_LIMIT_TURNS_PER_DAY,
+      globalPerDay: env.AGENT_DAILY_LIMIT,
+    }),
   };
 }
 

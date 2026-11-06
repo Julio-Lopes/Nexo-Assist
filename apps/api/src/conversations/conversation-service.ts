@@ -262,6 +262,31 @@ export class ConversationService {
     };
   }
 
+  /** Mensagens do funcionário em todas as conversas dele, para o limite diário. */
+  async countEmployeeMessagesForUserSince(employeeId: string, since: Date): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(messages)
+      .innerJoin(conversations, eq(conversations.id, messages.conversationId))
+      .where(
+        and(
+          eq(conversations.employeeId, employeeId),
+          eq(messages.author, "employee"),
+          gte(messages.createdAt, since),
+        ),
+      );
+    return row?.value ?? 0;
+  }
+
+  /** Respostas do agent em todas as conversas, para o teto global de uso do LLM. */
+  async countAgentRepliesSince(since: Date): Promise<number> {
+    const [row] = await this.db
+      .select({ value: count() })
+      .from(messages)
+      .where(and(eq(messages.author, "agent"), gte(messages.createdAt, since)));
+    return row?.value ?? 0;
+  }
+
   /** Trava atômica: só um turno do agent por conversa, inclusive entre instâncias serverless. */
   async tryLockAgent(conversationId: string, ttlMs: number): Promise<boolean> {
     const now = new Date();

@@ -40,7 +40,7 @@ export async function revokeSession(db: Database, token: string): Promise<void> 
 export function setSessionCookie(c: Context, token: string, expiresAt: Date, env: Env): void {
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
+    secure: env.secureCookies,
     sameSite: "Lax",
     path: "/",
     expires: expiresAt,

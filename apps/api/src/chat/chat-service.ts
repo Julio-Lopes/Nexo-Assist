@@ -31,6 +31,7 @@ import type { TicketView } from "@nexo/tickets";
 import type { ConversationService } from "../conversations/conversation-service";
 import { ApiError } from "../http/errors";
 import { toConversation, toMessage } from "../http/mappers";
+import type { SlidingWindowLimiter } from "../http/rate-limit";
 
 export interface ChatHooks {
   onUserMessage?: (message: Message, usage: MessageUsage) => Promise<void> | void;
@@ -51,6 +52,15 @@ export type TurnOutcome =
 
 /** Maior que o timeout total do agent (45 s): a trava expira sozinha se a function morrer. */
 const AGENT_LOCK_MS = 60_000;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface ChatLimits {
+  perMinute: SlidingWindowLimiter;
+  perUserPerDay: number;
+  globalPerDay: number;
+}
+
 const AGENT_NAME = "Nexo Assist";
 const UNAVAILABLE_TEXT = "Não consegui responder agora. Você pode tentar de novo ou falar com um analista.";
 
@@ -91,6 +101,7 @@ export class ChatService {
     private readonly conversations: ConversationService,
     private readonly services: AgentServices,
     private readonly model: string,
+    private readonly limits: ChatLimits,
   ) {}
 
   /** Validações que precisam virar status HTTP antes de o streaming começar. */
@@ -109,13 +120,42 @@ export class ChatService {
       );
     }
 
+    if (this.limits.perMinute.take(employee.id) > 0) {
+      throw new ApiError(429, "slow_down", "Você está enviando mensagens rápido demais. Aguarde alguns segundos.");
+    }
+
     let locked = false;
     if (conversation.status === "with_agent") {
+      // Os tetos diários só valem quando a mensagem vai para o LLM.
+      await this.assertDailyQuota(employee.id);
       locked = await this.conversations.tryLockAgent(conversationId, AGENT_LOCK_MS);
       if (!locked) throw new ApiError(409, "turn_in_progress", "Aguarde a resposta anterior terminar.");
     }
 
     return { employee, conversation, used, locked };
+  }
+
+  private async assertDailyQuota(employeeId: string): Promise<void> {
+    const since = new Date(Date.now() - DAY_MS);
+    const [mine, global] = await Promise.all([
+      this.conversations.countEmployeeMessagesForUserSince(employeeId, since),
+      this.conversations.countAgentRepliesSince(since),
+    ]);
+
+    if (mine >= this.limits.perUserPerDay) {
+      throw new ApiError(
+        429,
+        "daily_user_limit",
+        "Você chegou ao limite diário de mensagens do assistente nesta demonstração. Use “Falar com um analista” para continuar.",
+      );
+    }
+    if (global >= this.limits.globalPerDay) {
+      throw new ApiError(
+        429,
+        "daily_quota",
+        "O assistente atingiu o limite diário de uso desta demonstração. Você ainda pode falar com um analista.",
+      );
+    }
   }
 
   async runTurn(prepared: PreparedTurn, content: string, hooks: ChatHooks = {}): Promise<TurnOutcome> {

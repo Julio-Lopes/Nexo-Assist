@@ -15,6 +15,7 @@ import { ApiError } from "../http/errors";
 import { toUser } from "../http/mappers";
 import type { AppEnv } from "../http/types";
 import { parseJson } from "../http/validation";
+import { SlidingWindowLimiter, clientIp } from "../http/rate-limit";
 
 const REMEMBER_TTL_HOURS = 24 * 7;
 
@@ -26,13 +27,22 @@ const loginSchema = z.object({
 
 export function authRoutes(container: Container) {
   const app = new Hono<AppEnv>();
+  const loginAttempts = new SlidingWindowLimiter(10, 5 * 60_000);
 
   app.post("/login", async (c) => {
+    const ip = clientIp(c);
+    if (loginAttempts.retryAfter(ip) > 0) {
+      throw new ApiError(429, "too_many_attempts", "Muitas tentativas de login. Tente de novo em alguns minutos.");
+    }
+
     const { email, remember } = await parseJson(c, loginSchema);
 
     // Protótipo (PRD, Tela 1): qualquer senha vale para usuários cadastrados.
     const [user] = await container.db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (!user) throw new ApiError(401, "invalid_credentials", "E-mail ou senha inválidos.");
+    if (!user) {
+      loginAttempts.take(ip);
+      throw new ApiError(401, "invalid_credentials", "E-mail ou senha inválidos.");
+    }
 
     const ttl = remember ? REMEMBER_TTL_HOURS : container.env.SESSION_TTL_HOURS;
     const session = await createSession(container.db, user.id, ttl);
