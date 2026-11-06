@@ -5,7 +5,7 @@ import { setupTestDatabase } from "@nexo/db/testing";
 import type { AgentDecision, Message, MessageAttachment, MessageAuthor, User } from "@nexo/shared";
 import { createServices } from "@nexo/tickets";
 import { AgentUnavailableError, PostgresDraftStore, runAgentTurn, type TurnResult } from "../src";
-import type { CheckResult } from "./checks";
+import { GLOBAL_CHECKS, type CheckResult } from "./checks";
 import { SCENARIOS, type Scenario } from "./scenarios";
 
 try {
@@ -106,7 +106,7 @@ try {
         reply: result?.text ?? "",
         latencyMs: Date.now() - started,
         decision: result?.decision ?? null,
-        checks: result ? turn.checks.map((check) => check(result)) : [],
+        checks: result ? [...turn.checks, ...GLOBAL_CHECKS].map((check) => check(result)) : [],
         unavailable: result ? null : unavailable,
       };
       report.turns.push(turnReport);

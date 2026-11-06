@@ -91,3 +91,15 @@ export const anyOf =
     const results = checks.map((check) => check(r));
     return { label, pass: results.some((c) => c.pass), detail: results.map((c) => `${c.label}: ${c.pass ? "sim" : "não"}`).join("; ") };
   };
+
+/** Rodam em todo turno: qualidade da resposta e aderência do modelo ao formato. */
+export const GLOBAL_CHECKS: Check[] = [
+  textExcludes(/\{\s*"intent"|"rulesApplied"|record_decision/, "resposta sem decisão vazada"),
+  textExcludes(/\bOK\.?\s*$|\([^)]*\bcard\b[^)]*\)/i, "resposta sem enchimento nem bastidores"),
+  textExcludes(/chamado D-\d+/i, "não chama o rascunho de chamado"),
+  (r) => ({
+    label: "registrou a decisão pela ferramenta",
+    pass: !r.decision.rulesApplied.some((rule) => /inferida|recuperada/i.test(rule)),
+    detail: r.decision.rulesApplied.join("; ") || undefined,
+  }),
+];

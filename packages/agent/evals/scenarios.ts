@@ -202,7 +202,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "critico",
     title: "Parada para a equipe inteira",
-    rule: "Anexo A: prioridade crítica",
+    rule: "Anexo A: prioridade crítica e transferência em caso crítico",
     employeeEmail: BRUNO,
     turns: [
       {
@@ -210,6 +210,10 @@ export const SCENARIOS: Scenario[] = [
         checks: [
           draft("rascunho de E-mail com prioridade crítica", (d) => d.mode === "create" && d.draft.category === "email" && d.draft.priority === "critical"),
         ],
+      },
+      {
+        user: "Pode abrir.",
+        checks: [attachment("ticket", "mostra o chamado criado"), handoff("critical")],
       },
     ],
   },
