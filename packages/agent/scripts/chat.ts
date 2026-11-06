@@ -16,7 +16,7 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL não definida");
 
 const email = process.argv[2] ?? "ana.souza@nexo.com.br";
-const model = process.env.LLM_MODEL ?? "gemini-2.5-flash";
+const model = process.env.LLM_MODEL ?? "gemini-3.1-flash-lite";
 const { db, close } = createDb(databaseUrl, { max: 2 });
 
 const [row] = await db.select().from(users).where(eq(users.email, email)).limit(1);

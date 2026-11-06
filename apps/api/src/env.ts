@@ -9,7 +9,7 @@ const envSchema = z.object({
   SESSION_TTL_HOURS: z.coerce.number().positive().default(12),
   /** Força o cookie Secure ligado ou desligado. Padrão: ligado em produção. */
   COOKIE_SECURE: z.enum(["true", "false"]).optional(),
-  LLM_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  LLM_MODEL: z.string().min(1).default("gemini-3.1-flash-lite"),
   /** Lida diretamente pelo Mastra; validada aqui só para avisar quando falta. */
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
   /** Definida automaticamente pela Vercel. */

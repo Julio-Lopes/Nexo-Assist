@@ -14,7 +14,7 @@ try {
   // usa o ambiente
 }
 
-const MODEL = process.env.LLM_MODEL ?? "gemini-2.5-flash";
+const MODEL = process.env.LLM_MODEL ?? "gemini-3.1-flash-lite";
 /** Pausa entre turnos para caber no limite de requisições por minuto do free tier. */
 const DELAY_MS = Number(process.env.EVAL_DELAY_MS ?? 20_000);
 const RETRY_WAIT_MS = 60_000;
