@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@nexo/shared";
 import { TicketSystemUnavailableError, type TicketService, type TicketView } from "@nexo/tickets";
-import { confirmDraft, handoffToAnalyst, proposeTicketDraft } from "./handlers";
+import { confirmDraft, correctHandoffReason, handoffToAnalyst, proposeTicketDraft } from "./handlers";
 import type { DraftRecord, DraftStore, NewDraft, TurnContext } from "./ports";
 import { TurnRecorder } from "./recorder";
 
@@ -124,12 +124,33 @@ describe("confirm_draft", () => {
 
 describe("handoff_to_analyst", () => {
   it("transfere a conversa mesmo se o sistema legado falhar, com N2 para vencido", async () => {
-    const { ctx, recorder } = setup({ transfer: vi.fn().mockRejectedValue(new TicketSystemUnavailableError()) });
+    const { ctx, recorder } = setup({
+      getForRequester: vi.fn().mockResolvedValue(ticket({ overdue: true })),
+      transfer: vi.fn().mockRejectedValue(new TicketSystemUnavailableError()),
+    });
 
     const result = await handoffToAnalyst(ctx, { reason: "overdue", summary: "Chamado parado há 6 dias.", ticketId: "INC-20311" });
 
     expect(result.ok).toBe(true);
     expect(recorder.handoff).toMatchObject({ level: "N2", ticketId: "INC-20311" });
     expect(recorder.steps.find((s) => s.tool === "transfer_ticket")?.status).toBe("error");
+  });
+});
+
+describe("correctHandoffReason", () => {
+  it("troca crítico por vencido quando o chamado só está vencido", () => {
+    expect(correctHandoffReason("critical", ticket({ overdue: true })).reason).toBe("overdue");
+  });
+
+  it("usa crítico quando o chamado tem prioridade crítica", () => {
+    expect(correctHandoffReason("employee_request", ticket({ priority: "critical" })).reason).toBe("critical");
+  });
+
+  it("não aceita vencido para chamado dentro do prazo", () => {
+    expect(correctHandoffReason("overdue", ticket()).reason).toBe("employee_request");
+  });
+
+  it("mantém o motivo quando não há chamado", () => {
+    expect(correctHandoffReason("critical", null)).toEqual({ reason: "critical", note: null });
   });
 });

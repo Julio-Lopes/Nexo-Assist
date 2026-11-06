@@ -232,7 +232,8 @@ export async function proposeTicketDraft(ctx: TurnContext, input: DraftInput) {
       priority: PRIORITY_LABELS[priority],
       priorityReason: reason,
       responseDue: formatDateTime(dueAt),
-      instruction: "Explique a prioridade em uma frase e peça para conferir o rascunho. Não diga que o chamado foi criado.",
+      instruction:
+        "Explique a prioridade em uma frase e peça para conferir o rascunho abaixo. Não diga que o chamado foi criado e não cite o número do rascunho.",
     };
   } catch (error) {
     return failure(error);
@@ -305,7 +306,11 @@ export async function proposeTicketChange(ctx: TurnContext, input: ChangeInput) 
     });
     ctx.recorder.perform("propose_draft");
 
-    return { ok: true as const, draftId: draft.id, instruction: "Peça para conferir antes de aplicar." };
+    return {
+      ok: true as const,
+      draftId: draft.id,
+      instruction: "Peça para conferir abaixo antes de aplicar. Não cite o número do rascunho.",
+    };
   } catch (error) {
     return failure(error);
   }
@@ -328,7 +333,7 @@ export async function confirmDraft(ctx: TurnContext, input: { draftId: string })
       requiresHandoff: outcome.requiresHandoff,
       instruction: outcome.requiresHandoff
         ? "Chamado crítico: chame handoff_to_analyst com reason critical e o id do chamado."
-        : "Confirme em uma frase o que foi feito e o prazo de resposta.",
+        : "Em uma frase, informe o número do chamado e o prazo (ticket.nextResponseDue). Não diga que alguém foi avisado ou já está cuidando do caso.",
     };
   } catch (error) {
     return failure(error);
@@ -355,33 +360,79 @@ export interface HandoffInput {
   ticketId: string | null;
 }
 
+/**
+ * O modelo escolhe o motivo, mas ele precisa bater com o chamado:
+ * só é "crítico" se a prioridade for crítica, e só é "vencido" se o prazo passou.
+ */
+export function correctHandoffReason(
+  reason: HandoffReason,
+  ticket: TicketView | null,
+): { reason: HandoffReason; note: string | null } {
+  if (!ticket) return { reason, note: null };
+
+  if (ticket.priority === "critical") {
+    return reason === "critical" ? { reason, note: null } : { reason: "critical", note: `${ticket.id} tem prioridade crítica` };
+  }
+  if (reason === "critical") {
+    return ticket.overdue
+      ? { reason: "overdue", note: `${ticket.id} não é crítico, mas está vencido` }
+      : { reason: "employee_request", note: `${ticket.id} não é crítico` };
+  }
+  if (reason === "overdue" && !ticket.overdue) {
+    return { reason: "employee_request", note: `${ticket.id} está dentro do prazo` };
+  }
+  return { reason, note: null };
+}
+
 export async function handoffToAnalyst(ctx: TurnContext, input: HandoffInput) {
   if (ctx.recorder.handoff) return reject("A transferência já foi registrada neste turno.");
 
-  const level: SupportLevel = input.reason === "critical" || input.reason === "overdue" ? "N2" : "N1";
   const ticketId = input.ticketId?.trim().toUpperCase() || null;
+
+  // Lê o chamado antes de transferir: depois da transferência o prazo reinicia e "vencido" some.
+  let ticket: TicketView | null = null;
+  if (ticketId) {
+    try {
+      ticket = await ctx.services.tickets.getForRequester(ctx.employee.id, ticketId);
+    } catch {
+      // sem os dados do chamado, mantém o motivo informado
+    }
+  }
+
+  const corrected = correctHandoffReason(input.reason, ticket);
+  if (corrected.note) {
+    ctx.recorder.note({
+      tool: "check_handoff_reason",
+      label: "conferiu o motivo da transferência",
+      status: "success",
+      summary: `${HANDOFF_REASON_LABELS[input.reason]} → ${HANDOFF_REASON_LABELS[corrected.reason]}: ${corrected.note}`,
+    });
+  }
+
+  const reason = corrected.reason;
+  const level: SupportLevel = reason === "critical" || reason === "overdue" ? "N2" : "N1";
   let responseDue: string | null = null;
 
   if (ticketId) {
     try {
-      const ticket = await ctx.recorder.track(
+      const transferred = await ctx.recorder.track(
         "transfer_ticket",
         `transferiu o ${ticketId}`,
         () => ctx.services.tickets.transfer(ctx.employee.id, ticketId, { level, summary: input.summary, actor: actorFor(ctx.employee) }),
         () => `Suporte ${level}`,
       );
-      responseDue = ticket.dueAt ? formatDateTime(new Date(ticket.dueAt)) : null;
+      responseDue = transferred.dueAt ? formatDateTime(new Date(transferred.dueAt)) : null;
     } catch {
       // A conversa vai para o analista mesmo se o sistema legado falhar; o passo fica registrado como erro.
     }
   }
 
-  ctx.recorder.handoff = { reason: input.reason, summary: input.summary.trim(), ticketId, level };
+  ctx.recorder.handoff = { reason, summary: input.summary.trim(), ticketId, level };
   ctx.recorder.note({
     tool: "handoff",
     label: "chamou um analista",
     status: "success",
-    summary: `Suporte ${level} · ${HANDOFF_REASON_LABELS[input.reason]}`,
+    summary: `Suporte ${level} · ${HANDOFF_REASON_LABELS[reason]}`,
   });
   ctx.recorder.perform("handoff");
 
@@ -389,7 +440,7 @@ export async function handoffToAnalyst(ctx: TurnContext, input: HandoffInput) {
     ok: true as const,
     level: `Suporte ${level}`,
     responseDue,
-    instruction: "Diga para quem encaminhou e quando deve haver resposta. Depois disso você não responde mais nesta conversa.",
+    instruction: "Diga para quem encaminhou e quando deve haver resposta, sem prometer mais nada. Depois disso você não responde mais nesta conversa.",
   };
 }
 

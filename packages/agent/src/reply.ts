@@ -41,7 +41,9 @@ export function extractLeakedDecision(raw: string): { text: string; decision: De
 
 /** Remove frases repetidas, "OK" solto e comentários de bastidor sobre os cards. */
 export function cleanReply(text: string): string {
-  const withoutAsides = text.replace(/\s*\([^)]*\bcard\b[^)]*\)/gi, "");
+  const withoutAsides = text
+    .replace(/\s*\[[^\]]*\]/g, "")
+    .replace(/\s*\([^)]*\bcard\b[^)]*\)/gi, "");
   const sentences = withoutAsides.split(/(?<=[.!?])\s+/);
 
   const seen = new Set<string>();

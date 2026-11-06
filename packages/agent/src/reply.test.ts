@@ -50,4 +50,8 @@ describe("cleanReply", () => {
       "Encaminhei para o Suporte N1. Encaminhei para o Suporte N1. Confira o rascunho. (O card do rascunho foi exibido acima) OK.";
     expect(cleanReply(text)).toBe("Encaminhei para o Suporte N1. Confira o rascunho.");
   });
+
+  it("remove trechos entre colchetes", () => {
+    expect(cleanReply("Confira abaixo. [D-381: Reabertura de INC-20150 - Senha do SAP bloqueada]")).toBe("Confira abaixo.");
+  });
 });
