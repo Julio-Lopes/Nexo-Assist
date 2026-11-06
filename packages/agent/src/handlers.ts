@@ -153,7 +153,7 @@ export async function proposeTicketDraft(ctx: TurnContext, input: DraftInput) {
     const similar = await ctx.recorder.track(
       "find_similar",
       "verificou chamados parecidos",
-      () => tickets.findSimilar(ctx.employee.id, { title: input.title, category: input.category }),
+      () => tickets.findSimilar(ctx.employee.id, { title: input.title }),
       (list) => (list.length === 0 ? "nenhum parecido" : list.map((s) => `${s.ticket.id} (${s.score.toFixed(2)})`).join(", ")),
     );
 
