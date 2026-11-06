@@ -9,7 +9,7 @@ import { ReplyStream, cleanReply, extractLeakedDecision } from "./reply";
 import { createTools } from "./tools";
 
 export class AgentUnavailableError extends Error {
-  constructor(readonly cause: unknown) {
+  constructor(override readonly cause: unknown) {
     super("O assistente não conseguiu responder agora.");
     this.name = "AgentUnavailableError";
   }
