@@ -5,10 +5,11 @@ import { buildModelMessages } from "./history";
 import { buildInstructions } from "./instructions";
 import type { AgentServices, TurnContext } from "./ports";
 import { TurnRecorder, type HandoffRequest } from "./recorder";
+import { ReplyStream, cleanReply, extractLeakedDecision } from "./reply";
 import { createTools } from "./tools";
 
 export class AgentUnavailableError extends Error {
-  constructor(override readonly cause: unknown) {
+  constructor(readonly cause: unknown) {
     super("O assistente não conseguiu responder agora.");
     this.name = "AgentUnavailableError";
   }
@@ -36,6 +37,7 @@ export interface TurnResult {
 }
 
 const FORCED_HANDOFF_TEXT = "Vou chamar um analista para te ajudar com isso.";
+const RECOVERED_RULE = "Decisão escrita no texto pelo modelo e recuperada pelo sistema";
 
 function fallbackText(recorder: TurnRecorder): string {
   if (recorder.handoff) return "Encaminhei para um analista.";
@@ -60,7 +62,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<TurnResult>
     tools: createTools(ctx),
   });
 
-  let text = "";
+  const reply = new ReplyStream(options.onText);
   let streamError: unknown = null;
 
   try {
@@ -77,29 +79,37 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<TurnResult>
       },
     });
 
-    for await (const delta of stream.textStream) {
-      text += delta;
-      options.onText?.(delta);
-    }
+    for await (const delta of stream.textStream) reply.push(delta);
   } catch (error) {
     throw new AgentUnavailableError(error);
   }
 
+  // Decisão vazada no texto: sai da resposta e vira a decisão do turno, marcada como recuperada.
+  const leaked = extractLeakedDecision(reply.raw);
+  if (leaked.decision) {
+    if (!recorder.declared) {
+      recorder.declared = { ...leaked.decision, rulesApplied: [...leaked.decision.rulesApplied, RECOVERED_RULE] };
+    }
+  } else {
+    reply.flushHeld();
+  }
+
+  let text = cleanReply(leaked.text);
+
   // Erro do modelo sem nenhum efeito: não há o que salvar como resposta.
-  if (streamError && !text.trim() && recorder.steps.length === 0) {
+  if (streamError && !text && recorder.steps.length === 0) {
     throw new AgentUnavailableError(streamError);
   }
 
-  if (!text.trim()) {
+  if (!text) {
     text = fallbackText(recorder);
     options.onText?.(text);
   }
 
   const { decision, forcedHandoff } = finalizeDecision(recorder);
   if (forcedHandoff) {
-    const extra = `\n\n${FORCED_HANDOFF_TEXT}`;
-    text += extra;
-    options.onText?.(extra);
+    text = `${text}\n\n${FORCED_HANDOFF_TEXT}`;
+    options.onText?.(`\n\n${FORCED_HANDOFF_TEXT}`);
   }
 
   return {
