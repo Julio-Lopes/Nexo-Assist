@@ -81,7 +81,8 @@ describe("propose_ticket_draft", () => {
 
     expect(result.ok).toBe(false);
     expect(create).not.toHaveBeenCalled();
-    expect(recorder.attachments).toHaveLength(0);
+    expect(recorder.attachments).toEqual([{ kind: "ticket", ticketId: "INC-20311" }]);
+    expect(recorder.performed).toContain("show_ticket");
   });
 
   it("aceita criar quando o funcionário disse que é outro problema", async () => {
@@ -144,6 +145,10 @@ describe("correctHandoffReason", () => {
 
   it("usa crítico quando o chamado tem prioridade crítica", () => {
     expect(correctHandoffReason("employee_request", ticket({ priority: "critical" })).reason).toBe("critical");
+  });
+
+  it("usa vencido quando o funcionário pede analista para um chamado vencido", () => {
+    expect(correctHandoffReason("employee_request", ticket({ overdue: true })).reason).toBe("overdue");
   });
 
   it("não aceita vencido para chamado dentro do prazo", () => {

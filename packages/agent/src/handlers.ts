@@ -162,9 +162,12 @@ export async function proposeTicketDraft(ctx: TurnContext, input: DraftInput) {
       (s) => s.score >= SIMILARITY_LIKELY_DUPLICATE && !input.notDuplicateOf.includes(s.ticket.id),
     );
     if (duplicate) {
+      // O funcionário vê de qual chamado se trata, sem depender de o modelo citar o número.
+      ctx.recorder.attach({ kind: "ticket", ticketId: duplicate.ticket.id });
+      ctx.recorder.perform("show_ticket");
       return {
         ...reject(
-          "Já existe um chamado parecido. Pergunte se é o mesmo problema: se for, use propose_ticket_change; se não for, chame de novo com notDuplicateOf.",
+          `Já existe o ${duplicate.ticket.id} parecido, e o card dele foi exibido. Cite o número e pergunte se é o mesmo problema: se for, use propose_ticket_change; se não for, chame de novo com notDuplicateOf.`,
         ),
         similarTicket: describeTicket(duplicate.ticket, ctx.now),
       };
@@ -363,6 +366,7 @@ export interface HandoffInput {
 /**
  * O modelo escolhe o motivo, mas ele precisa bater com o chamado:
  * só é "crítico" se a prioridade for crítica, e só é "vencido" se o prazo passou.
+ * Para um chamado vencido, "vencido" prevalece sobre o pedido genérico do funcionário.
  */
 export function correctHandoffReason(
   reason: HandoffReason,
@@ -373,10 +377,11 @@ export function correctHandoffReason(
   if (ticket.priority === "critical") {
     return reason === "critical" ? { reason, note: null } : { reason: "critical", note: `${ticket.id} tem prioridade crítica` };
   }
+  if (ticket.overdue && (reason === "critical" || reason === "employee_request")) {
+    return { reason: "overdue", note: `${ticket.id} está vencido` };
+  }
   if (reason === "critical") {
-    return ticket.overdue
-      ? { reason: "overdue", note: `${ticket.id} não é crítico, mas está vencido` }
-      : { reason: "employee_request", note: `${ticket.id} não é crítico` };
+    return { reason: "employee_request", note: `${ticket.id} não é crítico` };
   }
   if (reason === "overdue" && !ticket.overdue) {
     return { reason: "employee_request", note: `${ticket.id} está dentro do prazo` };
