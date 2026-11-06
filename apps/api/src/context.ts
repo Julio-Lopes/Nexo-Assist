@@ -1,6 +1,12 @@
 import { PostgresDraftStore, type AgentServices, type DraftStore } from "@nexo/agent";
 import { createDb, type Database } from "@nexo/db";
-import { createServices, instabilityFromEnv, type KnowledgeService, type TicketService } from "@nexo/tickets";
+import {
+  createServices,
+  instabilityFromEnv,
+  type InstabilityOptions,
+  type KnowledgeService,
+  type TicketService,
+} from "@nexo/tickets";
 import { ChatService } from "./chat/chat-service";
 import { SyncedDraftStore } from "./chat/synced-draft-store";
 import { ConversationService } from "./conversations/conversation-service";
@@ -16,17 +22,18 @@ export interface Container {
   chat: ChatService;
 }
 
-let container: Container | undefined;
+export interface ContainerOverrides {
+  db?: Database;
+  /** null desliga a simulação de instabilidade (testes). */
+  instability?: InstabilityOptions | null;
+}
 
-/** Criado na primeira requisição e reaproveitado enquanto a instância (ou function) estiver quente. */
-export function getContainer(): Container {
-  if (container) return container;
-
-  const env = loadEnv();
+export function buildContainer(env: Env, overrides: ContainerOverrides = {}): Container {
   // Em serverless cada instância tem seu pool: mantém 1 conexão para não esgotar o Postgres.
-  const { db } = createDb(env.DATABASE_URL, { max: env.VERCEL ? 1 : 5 });
+  const db = overrides.db ?? createDb(env.DATABASE_URL, { max: env.VERCEL ? 1 : 5 }).db;
+
   const services = createServices(db, {
-    instability: instabilityFromEnv(),
+    instability: overrides.instability === undefined ? instabilityFromEnv() : overrides.instability,
     retry: {
       retries: 2,
       baseDelayMs: 250,
@@ -38,11 +45,11 @@ export function getContainer(): Container {
   const drafts = new SyncedDraftStore(new PostgresDraftStore(db), conversations);
   const agentServices: AgentServices = { tickets: services.tickets, knowledge: services.knowledge, drafts };
 
-  if (!env.GOOGLE_GENERATIVE_AI_API_KEY) {
+  if (!env.GOOGLE_GENERATIVE_AI_API_KEY && env.NODE_ENV !== "test") {
     console.warn("[api] GOOGLE_GENERATIVE_AI_API_KEY ausente: o agent vai responder como indisponível.");
   }
 
-  container = {
+  return {
     env,
     db,
     ...services,
@@ -50,5 +57,12 @@ export function getContainer(): Container {
     drafts,
     chat: new ChatService(conversations, agentServices, env.LLM_MODEL),
   };
+}
+
+let container: Container | undefined;
+
+/** Criado na primeira requisição e reaproveitado enquanto a instância (ou function) estiver quente. */
+export function getContainer(): Container {
+  container ??= buildContainer(loadEnv());
   return container;
 }
