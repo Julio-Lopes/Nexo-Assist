@@ -46,6 +46,9 @@ function slaSummary(ticket: TicketView, now: Date): string {
   return `próxima resposta até ${formatDateTime(new Date(ticket.dueAt))}`;
 }
 
+/** Tela 3: chamado vencido vem sempre com a oferta de analista. */
+const OVERDUE_OPTIONS = ["Falar com um analista", "Adicionar informação", "Não, obrigado"] as const;
+
 /* ---------- consulta ---------- */
 
 export async function listMyTickets(ctx: TurnContext, input: { includeClosed: boolean }) {
@@ -80,6 +83,14 @@ export async function getTicket(ctx: TurnContext, input: { ticketId: string }) {
     ctx.recorder.attach({ kind: "ticket", ticketId: ticket.id });
     ctx.recorder.perform("show_ticket");
 
+    if (ticket.overdue) {
+      ctx.recorder.attach({
+        kind: "options",
+        question: null,
+        options: OVERDUE_OPTIONS.map((label, index) => ({ id: `opt-${index + 1}`, label })),
+      });
+    }
+
     return {
       ok: true as const,
       ticket: describeTicket(ticket, ctx.now),
@@ -88,6 +99,9 @@ export async function getTicket(ctx: TurnContext, input: { ticketId: string }) {
         text: e.body,
         when: timeAgo(new Date(e.createdAt), ctx.now),
       })),
+      instruction: ticket.overdue
+      ? "O chamado está vencido e as opções (falar com analista, adicionar informação, não) já foram exibidas. Diga em uma frase que o prazo passou e pergunte como prefere seguir. Não chame offer_options."
+      : "Resuma em uma frase o status e quando deve haver resposta. O card já mostra os detalhes.",
     };
   } catch (error) {
     return failure(error);
@@ -346,6 +360,10 @@ export async function confirmDraft(ctx: TurnContext, input: { draftId: string })
 /* ---------- interação e transferência ---------- */
 
 export function offerOptions(ctx: TurnContext, input: { question: string | null; options: string[] }) {
+  if (ctx.recorder.attachments.some((a) => a.kind === "options")) {
+    return reject("As opções já foram exibidas neste turno.");
+  }
+
   const options = input.options.map((o) => o.trim()).filter(Boolean).slice(0, 4);
   if (options.length < 2) return reject("Ofereça de 2 a 4 opções.");
 

@@ -94,7 +94,7 @@ export const anyOf =
 
 /** Rodam em todo turno: qualidade da resposta e aderência do modelo ao formato. */
 export const GLOBAL_CHECKS: Check[] = [
-  textExcludes(/\{\s*"intent"|"rulesApplied"|record_decision/, "resposta sem decisão vazada"),
+  textExcludes(/\{\s*"|record_decision/, "resposta sem JSON nem decisão vazada"),
   textExcludes(/\bOK\.?\s*$|\([^)]*\bcard\b[^)]*\)|\[[^\]]*\]/i, "resposta sem enchimento nem bastidores"),
   textExcludes(/\bD-\d+/, "não cita o número do rascunho"),
   textExcludes(/notificad|foi avisad|já (está|estão) cuidando|equipe .{0,30}(avisad|acionad)/i, "não promete ações que o sistema não fez"),

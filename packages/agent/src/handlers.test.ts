@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@nexo/shared";
 import { TicketSystemUnavailableError, type TicketService, type TicketView } from "@nexo/tickets";
-import { confirmDraft, correctHandoffReason, handoffToAnalyst, proposeTicketDraft } from "./handlers";
+import { confirmDraft, correctHandoffReason, getTicket, handoffToAnalyst, proposeTicketDraft } from "./handlers";
 import type { DraftRecord, DraftStore, NewDraft, TurnContext } from "./ports";
 import { TurnRecorder } from "./recorder";
 
@@ -157,5 +157,29 @@ describe("correctHandoffReason", () => {
 
   it("mantém o motivo quando não há chamado", () => {
     expect(correctHandoffReason("critical", null)).toEqual({ reason: "critical", note: null });
+  });
+});
+
+describe("get_ticket", () => {
+  it("oferece analista quando o chamado está vencido", async () => {
+    const { ctx, recorder } = setup({
+      getForRequester: vi.fn().mockResolvedValue(ticket({ overdue: true })),
+      listEvents: vi.fn().mockResolvedValue([]),
+    });
+
+    await getTicket(ctx, { ticketId: "INC-20311" });
+
+    expect(recorder.attachments.map((a) => a.kind)).toEqual(["ticket", "options"]);
+  });
+
+  it("não oferece opções para chamado dentro do prazo", async () => {
+    const { ctx, recorder } = setup({
+      getForRequester: vi.fn().mockResolvedValue(ticket()),
+      listEvents: vi.fn().mockResolvedValue([]),
+    });
+
+    await getTicket(ctx, { ticketId: "INC-20311" });
+
+    expect(recorder.attachments.map((a) => a.kind)).toEqual(["ticket"]);
   });
 });
