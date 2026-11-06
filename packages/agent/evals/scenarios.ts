@@ -142,6 +142,7 @@ export const SCENARIOS: Scenario[] = [
           anyOf(
             "aponta o INC-20311 existente",
             textIncludes(/INC-20311/, "menciona INC-20311"),
+            attachment("ticket", "mostra o card do INC-20311", (a) => a.ticketId === "INC-20311"),
             draft("propõe atualizar o INC-20311", (d) => d.mode === "update" && d.targetTicketId === "INC-20311"),
           ),
         ],
